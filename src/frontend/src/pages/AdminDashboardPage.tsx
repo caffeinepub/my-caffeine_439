@@ -22,12 +22,23 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { AlertCircle, Eye, Loader2, LogOut, Plus, Search } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import {
+  AlertCircle,
+  Eye,
+  ImageIcon,
+  Loader2,
+  LogOut,
+  Newspaper,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Priority, Status } from "../backend";
 import StatusBadge, { STATUS_LABELS } from "../components/StatusBadge";
 import { useActor } from "../hooks/useActor";
+import { useImageUpload } from "../hooks/useImageUpload";
 import { useInternetIdentity } from "../hooks/useInternetIdentity";
 import {
   useAllComplaints,
@@ -61,6 +72,20 @@ const COMPLAINT_TYPE_LABELS: Record<string, string> = {
   other: "অন্যান্য",
 };
 
+interface NoticeFormState {
+  title: string;
+  content: string;
+  isImportant: boolean;
+  imageId: string | null;
+}
+
+interface NewsFormState {
+  title: string;
+  content: string;
+  isBreaking: boolean;
+  imageId: string | null;
+}
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { clear, identity } = useInternetIdentity();
@@ -74,12 +99,32 @@ export default function AdminDashboardPage() {
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterType, setFilterType] = useState("all");
+
+  // Notice modal state
   const [showNoticeModal, setShowNoticeModal] = useState(false);
-  const [noticeForm, setNoticeForm] = useState({
+  const [noticeForm, setNoticeForm] = useState<NoticeFormState>({
     title: "",
     content: "",
     isImportant: false,
+    imageId: null,
   });
+  const [noticeImagePreview, setNoticeImagePreview] = useState<string | null>(
+    null,
+  );
+  const noticeFileRef = useRef<HTMLInputElement>(null);
+
+  // News modal state
+  const [showNewsModal, setShowNewsModal] = useState(false);
+  const [newsForm, setNewsForm] = useState<NewsFormState>({
+    title: "",
+    content: "",
+    isBreaking: false,
+    imageId: null,
+  });
+  const [newsImagePreview, setNewsImagePreview] = useState<string | null>(null);
+  const newsFileRef = useRef<HTMLInputElement>(null);
+
+  const { upload: uploadImage, uploading: uploadingImage } = useImageUpload();
 
   // Check both password session and internet identity
   const hasPasswordSession = isPasswordAdmin();
@@ -102,18 +147,101 @@ export default function AdminDashboardPage() {
     navigate({ to: "/admin/login" });
   };
 
+  // Notice image upload handler
+  const handleNoticeImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setNoticeImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    try {
+      const blobId = await uploadImage(file);
+      setNoticeForm((p) => ({ ...p, imageId: blobId }));
+      toast.success("ছবি আপলোড হয়েছে");
+    } catch {
+      toast.error("ছবি আপলোড ব্যর্থ হয়েছে");
+      setNoticeImagePreview(null);
+    }
+  };
+
+  // News image upload handler
+  const handleNewsImageChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => setNewsImagePreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
+    try {
+      const blobId = await uploadImage(file);
+      setNewsForm((p) => ({ ...p, imageId: blobId }));
+      toast.success("ছবি আপলোড হয়েছে");
+    } catch {
+      toast.error("ছবি আপলোড ব্যর্থ হয়েছে");
+      setNewsImagePreview(null);
+    }
+  };
+
+  const resetNoticeModal = () => {
+    setShowNoticeModal(false);
+    setNoticeForm({
+      title: "",
+      content: "",
+      isImportant: false,
+      imageId: null,
+    });
+    setNoticeImagePreview(null);
+    if (noticeFileRef.current) noticeFileRef.current.value = "";
+  };
+
+  const resetNewsModal = () => {
+    setShowNewsModal(false);
+    setNewsForm({ title: "", content: "", isBreaking: false, imageId: null });
+    setNewsImagePreview(null);
+    if (newsFileRef.current) newsFileRef.current.value = "";
+  };
+
   const addNoticeMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("No actor");
-      await actor.addNotice(noticeForm);
+      // Cast to any to support extended NoticeInput with imageId
+      const actorAny = actor as any;
+      await actorAny.addNotice({
+        title: noticeForm.title,
+        content: noticeForm.content,
+        isImportant: noticeForm.isImportant,
+        imageId: noticeForm.imageId ? [noticeForm.imageId] : [],
+      });
     },
     onSuccess: () => {
       toast.success("নোটিশ যোগ দেওয়া হয়েছে");
-      setShowNoticeModal(false);
-      setNoticeForm({ title: "", content: "", isImportant: false });
+      resetNoticeModal();
       queryClient.invalidateQueries({ queryKey: ["notices"] });
     },
     onError: () => toast.error("নোটিশ যোগ দেওয়া সম্ভব হয়নি"),
+  });
+
+  const addNewsMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("No actor");
+      // Cast to any to support new addNews method
+      const actorAny = actor as any;
+      await actorAny.addNews({
+        title: newsForm.title,
+        content: newsForm.content,
+        isBreaking: newsForm.isBreaking,
+        imageId: newsForm.imageId ? [newsForm.imageId] : [],
+      });
+    },
+    onSuccess: () => {
+      toast.success("খবর প্রকাশিত হয়েছে");
+      resetNewsModal();
+      queryClient.invalidateQueries({ queryKey: ["news"] });
+    },
+    onError: () => toast.error("খবর প্রকাশ সম্ভব হয়নি"),
   });
 
   const filtered = useMemo(() => {
@@ -157,7 +285,7 @@ export default function AdminDashboardPage() {
             <h1 className="font-bold text-lg">অ্যাডমিন ড্যাশবোর্ড</h1>
             <p className="text-white/60 text-xs">বাংলাদেশ গার্মেন্ট শ্রমিক সংহতি</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <Button
               onClick={() => setShowNoticeModal(true)}
               size="sm"
@@ -166,6 +294,15 @@ export default function AdminDashboardPage() {
             >
               <Plus size={14} className="mr-1" />
               নোটিশ
+            </Button>
+            <Button
+              onClick={() => setShowNewsModal(true)}
+              size="sm"
+              className="bg-red-primary text-white hover:bg-red-primary/90 text-xs"
+              data-ocid="admin_dashboard.add_news.button"
+            >
+              <Newspaper size={14} className="mr-1" />
+              খবর প্রকাশ
             </Button>
             <Button
               onClick={handleLogout}
@@ -419,8 +556,17 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Add Notice Modal */}
-      <Dialog open={showNoticeModal} onOpenChange={setShowNoticeModal}>
-        <DialogContent data-ocid="admin_dashboard.notice.dialog">
+      <Dialog
+        open={showNoticeModal}
+        onOpenChange={(open) => {
+          if (!open) resetNoticeModal();
+          else setShowNoticeModal(true);
+        }}
+      >
+        <DialogContent
+          className="max-w-lg"
+          data-ocid="admin_dashboard.notice.dialog"
+        >
           <DialogHeader>
             <DialogTitle className="text-navy">নতুন নোটিশ যোগ দিন</DialogTitle>
           </DialogHeader>
@@ -452,6 +598,73 @@ export default function AdminDashboardPage() {
                 data-ocid="admin_dashboard.notice_content.textarea"
               />
             </div>
+            {/* Image Upload - using button for accessibility */}
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                ফটো (ঐচ্ছিক)
+              </Label>
+              <button
+                type="button"
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-green-primary/50 transition-colors text-left"
+                onClick={() => noticeFileRef.current?.click()}
+                data-ocid="admin_dashboard.notice_image.dropzone"
+              >
+                {noticeImagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={noticeImagePreview}
+                      alt="preview"
+                      className="w-full h-40 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNoticeImagePreview(null);
+                        setNoticeForm((p) => ({ ...p, imageId: null }));
+                        if (noticeFileRef.current)
+                          noticeFileRef.current.value = "";
+                      }}
+                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      aria-label="ছবি সরান"
+                    >
+                      <X size={14} />
+                    </button>
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center rounded-lg">
+                        <Loader2
+                          size={24}
+                          className="animate-spin text-green-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
+                    {uploadingImage ? (
+                      <Loader2
+                        size={24}
+                        className="animate-spin text-green-primary"
+                      />
+                    ) : (
+                      <ImageIcon size={24} className="text-gray-400" />
+                    )}
+                    <span className="text-xs">
+                      {uploadingImage ? "আপলোড হচ্ছে..." : "ছবি বেছে নিন"}
+                    </span>
+                  </div>
+                )}
+              </button>
+              <input
+                ref={noticeFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleNoticeImageChange}
+                aria-label="নোটিশ ছবি আপলোড"
+                data-ocid="admin_dashboard.notice_image.upload_button"
+              />
+            </div>
             <div className="flex items-center gap-2">
               <Checkbox
                 id="isImportant"
@@ -469,7 +682,7 @@ export default function AdminDashboardPage() {
           <DialogFooter className="gap-2">
             <Button
               variant="outline"
-              onClick={() => setShowNoticeModal(false)}
+              onClick={resetNoticeModal}
               data-ocid="admin_dashboard.notice.cancel_button"
             >
               বাতিল
@@ -478,6 +691,7 @@ export default function AdminDashboardPage() {
               onClick={() => addNoticeMutation.mutate()}
               disabled={
                 addNoticeMutation.isPending ||
+                uploadingImage ||
                 !noticeForm.title ||
                 !noticeForm.content
               }
@@ -488,6 +702,160 @@ export default function AdminDashboardPage() {
                 <Loader2 size={16} className="animate-spin mr-1" />
               ) : null}
               যোগ দিন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add News Modal */}
+      <Dialog
+        open={showNewsModal}
+        onOpenChange={(open) => {
+          if (!open) resetNewsModal();
+          else setShowNewsModal(true);
+        }}
+      >
+        <DialogContent
+          className="max-w-lg"
+          data-ocid="admin_dashboard.news.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-navy flex items-center gap-2">
+              <Newspaper size={18} />
+              নতুন খবর প্রকাশ করুন
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                শিরোনাম *
+              </Label>
+              <Input
+                value={newsForm.title}
+                onChange={(e) =>
+                  setNewsForm((p) => ({ ...p, title: e.target.value }))
+                }
+                placeholder="খবরের শিরোনাম"
+                data-ocid="admin_dashboard.news_title.input"
+              />
+            </div>
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                বিষয়বস্তু *
+              </Label>
+              <Textarea
+                value={newsForm.content}
+                onChange={(e) =>
+                  setNewsForm((p) => ({ ...p, content: e.target.value }))
+                }
+                placeholder="খবরের বিস্তারিত বিষয়"
+                rows={5}
+                data-ocid="admin_dashboard.news_content.textarea"
+              />
+            </div>
+            {/* News Image Upload - using button for accessibility */}
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                ফটো (ঐচ্ছিক)
+              </Label>
+              <button
+                type="button"
+                className="w-full border-2 border-dashed border-gray-200 rounded-xl p-4 hover:border-red-primary/50 transition-colors text-left"
+                onClick={() => newsFileRef.current?.click()}
+                data-ocid="admin_dashboard.news_image.dropzone"
+              >
+                {newsImagePreview ? (
+                  <div className="relative">
+                    <img
+                      src={newsImagePreview}
+                      alt="preview"
+                      className="w-full h-40 object-cover rounded-lg"
+                    />
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setNewsImagePreview(null);
+                        setNewsForm((p) => ({ ...p, imageId: null }));
+                        if (newsFileRef.current) newsFileRef.current.value = "";
+                      }}
+                      className="absolute top-2 right-2 bg-black/50 text-white rounded-full p-1 hover:bg-black/70"
+                      aria-label="ছবি সরান"
+                    >
+                      <X size={14} />
+                    </button>
+                    {uploadingImage && (
+                      <div className="absolute inset-0 bg-white/70 flex items-center justify-center rounded-lg">
+                        <Loader2
+                          size={24}
+                          className="animate-spin text-red-primary"
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center gap-2 py-4 text-muted-foreground">
+                    {uploadingImage ? (
+                      <Loader2
+                        size={24}
+                        className="animate-spin text-red-primary"
+                      />
+                    ) : (
+                      <ImageIcon size={24} className="text-gray-400" />
+                    )}
+                    <span className="text-xs">
+                      {uploadingImage ? "আপলোড হচ্ছে..." : "ছবি বেছে নিন"}
+                    </span>
+                  </div>
+                )}
+              </button>
+              <input
+                ref={newsFileRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleNewsImageChange}
+                aria-label="খবর ছবি আপলোড"
+                data-ocid="admin_dashboard.news_image.upload_button"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                id="isBreaking"
+                checked={newsForm.isBreaking}
+                onCheckedChange={(v) =>
+                  setNewsForm((p) => ({ ...p, isBreaking: !!v }))
+                }
+                data-ocid="admin_dashboard.news_breaking.checkbox"
+              />
+              <label htmlFor="isBreaking" className="text-sm">
+                ব্রেকিং নিউজ হিসেবে চিহ্নিত করুন
+              </label>
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={resetNewsModal}
+              data-ocid="admin_dashboard.news.cancel_button"
+            >
+              বাতিল
+            </Button>
+            <Button
+              onClick={() => addNewsMutation.mutate()}
+              disabled={
+                addNewsMutation.isPending ||
+                uploadingImage ||
+                !newsForm.title ||
+                !newsForm.content
+              }
+              className="bg-red-primary text-white"
+              data-ocid="admin_dashboard.news.confirm_button"
+            >
+              {addNewsMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin mr-1" />
+              ) : null}
+              প্রকাশ করুন
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -59,23 +59,50 @@ actor {
     };
   };
 
-  module Notice {
-    public type Notice = {
+  // Notice types
+  // OLD Notice type (without imageId) - kept for stable variable compatibility on upgrade
+  type NoticeV1 = {
+    title : Text;
+    content : Text;
+    isImportant : Bool;
+    createdAt : Time.Time;
+  };
+
+  // NEW Notice type (with imageId)
+  type NoticeV2 = {
+    title : Text;
+    content : Text;
+    isImportant : Bool;
+    imageId : ?Text;
+    createdAt : Time.Time;
+  };
+
+  func compareNotices(n1 : NoticeV2, n2 : NoticeV2) : Order.Order {
+    switch (Int.compare(n2.createdAt, n1.createdAt)) {
+      case (#equal) { Text.compare(n1.title, n2.title) };
+      case (order) { order };
+    };
+  };
+
+  module News {
+    public type News = {
       title : Text;
       content : Text;
-      isImportant : Bool;
+      imageId : ?Text;
+      isBreaking : Bool;
       createdAt : Time.Time;
     };
 
-    public func compare(notice1 : Notice, notice2 : Notice) : Order.Order {
-      switch (Int.compare(notice2.createdAt, notice1.createdAt)) {
-        case (#equal) { Text.compare(notice1.title, notice2.title) };
+    public func compare(news1 : News, news2 : News) : Order.Order {
+      switch (Int.compare(news2.createdAt, news1.createdAt)) {
+        case (#equal) { Text.compare(news1.title, news2.title) };
         case (order) { order };
       };
     };
   };
 
   public type Complaint = Complaint.Complaint;
+  public type Notice = NoticeV2;
   public type ComplaintStats = {
     total : Nat;
     pending : Nat;
@@ -88,10 +115,37 @@ actor {
   };
 
   let complaints = Map.empty<Text, Complaint>();
-  let notices = Map.empty<Text, Notice.Notice>();
+
+  // Keep the original `notices` variable with the OLD type (NoticeV1) for stable upgrade compatibility.
+  // This preserves existing data. On first run after upgrade, data is migrated to notices2.
+  let notices = Map.empty<Text, NoticeV1>();
+
+  // New notices map supporting imageId
+  let notices2 = Map.empty<Text, NoticeV2>();
+
+  let newsItems = Map.empty<Text, News.News>();
   let userProfiles = Map.empty<Principal, UserProfile>();
 
   var complaintCounter = 0;
+  var newsCounter = 0;
+  transient var noticesMigrated = false;
+
+  // On each startup, migrate any remaining old notices (v1) into notices2
+  if (not noticesMigrated) {
+    for ((id, old) in notices.entries()) {
+      if (not notices2.containsKey(id)) {
+        notices2.add(id, {
+          title = old.title;
+          content = old.content;
+          isImportant = old.isImportant;
+          imageId = null;
+          createdAt = old.createdAt;
+        });
+      };
+    };
+    notices.clear();
+    noticesMigrated := true;
+  };
 
   public type ComplaintInput = {
     complainantName : Text;
@@ -130,6 +184,14 @@ actor {
     title : Text;
     content : Text;
     isImportant : Bool;
+    imageId : ?Text;
+  };
+
+  public type NewsInput = {
+    title : Text;
+    content : Text;
+    imageId : ?Text;
+    isBreaking : Bool;
   };
 
   let accessControlState = AccessControl.initState();
@@ -172,7 +234,6 @@ actor {
 
   // Complaint Management
   public shared ({ caller }) func submitComplaint(input : ComplaintInput) : async Text {
-    // Allow any caller including guests to submit complaints
     let complaintNumber = generateComplaintNumber();
     let now = Time.now();
     let complaint : Complaint = {
@@ -216,7 +277,6 @@ actor {
       case (null) { Runtime.trap("Complaint not found") };
       case (?c) { c };
     };
-
     let updatedComplaint : Complaint = {
       complaint with
       status = newStatus;
@@ -233,7 +293,6 @@ actor {
       case (null) { Runtime.trap("Complaint not found") };
       case (?c) { c };
     };
-
     let updatedComplaint : Complaint = {
       complaint with
       status = newStatus;
@@ -308,10 +367,8 @@ actor {
     complaints.add(complaintNumber, updatedComplaint);
   };
 
-  public query ({ caller }) func getComplaintStats() : async ComplaintStats {
-    if (not (AccessControl.isAdmin(accessControlState, caller))) {
-      Runtime.trap("Unauthorized: Only admins can view complaint statistics");
-    };
+  // PUBLIC stats - no auth required
+  public query func getComplaintStats() : async ComplaintStats {
     var total = 0;
     var pending = 0;
     var resolved = 0;
@@ -331,12 +388,7 @@ actor {
       };
     };
 
-    {
-      total;
-      pending;
-      resolved;
-      urgent;
-    };
+    { total; pending; resolved; urgent };
   };
 
   // Notice Board Management
@@ -345,26 +397,60 @@ actor {
       Runtime.trap("Unauthorized: Only admins can perform this action");
     };
     let noticeId = Time.now().toText();
-    let notice : Notice.Notice = {
-      input with
+    let notice : NoticeV2 = {
+      title = input.title;
+      content = input.content;
+      isImportant = input.isImportant;
+      imageId = input.imageId;
       createdAt = Time.now();
     };
-    notices.add(noticeId, notice);
+    notices2.add(noticeId, notice);
     noticeId;
   };
 
-  public query ({ caller }) func getNotices() : async [Notice.Notice] {
-    // Public notices are viewable by everyone including guests
-    notices.values().toArray().sort();
+  public query func getNotices() : async [NoticeV2] {
+    notices2.values().toArray().sort(compareNotices);
   };
 
   public shared ({ caller }) func deleteNotice(noticeId : Text) : async () {
     if (not (AccessControl.isAdmin(accessControlState, caller))) {
       Runtime.trap("Unauthorized: Only admins can perform this action");
     };
-    if (not notices.containsKey(noticeId)) {
+    if (not notices2.containsKey(noticeId)) {
       Runtime.trap("Notice not found");
     };
-    notices.remove(noticeId);
+    notices2.remove(noticeId);
+  };
+
+  // News/Updates Management
+  public shared ({ caller }) func addNews(input : NewsInput) : async Text {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    newsCounter += 1;
+    let newsId = "NEWS" # newsCounter.toText() # "_" # Time.now().toText();
+    let news : News.News = {
+      title = input.title;
+      content = input.content;
+      imageId = input.imageId;
+      isBreaking = input.isBreaking;
+      createdAt = Time.now();
+    };
+    newsItems.add(newsId, news);
+    newsId;
+  };
+
+  public query func getNews() : async [News.News] {
+    newsItems.values().toArray().sort();
+  };
+
+  public shared ({ caller }) func deleteNews(newsId : Text) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    if (not newsItems.containsKey(newsId)) {
+      Runtime.trap("News not found");
+    };
+    newsItems.remove(newsId);
   };
 };

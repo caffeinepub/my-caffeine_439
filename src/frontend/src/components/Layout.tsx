@@ -1,5 +1,5 @@
 import { Link, useLocation } from "@tanstack/react-router";
-import { Facebook, Mail, Menu, Phone, X, Youtube } from "lucide-react";
+import { Facebook, Mail, Menu, Phone, X } from "lucide-react";
 import { useState } from "react";
 
 interface LayoutProps {
@@ -46,22 +46,13 @@ export default function Layout({ children }: LayoutProps) {
             </a>
             <div className="flex items-center gap-2">
               <a
-                href="https://facebook.com"
+                href="https://www.facebook.com/share/175bUUUcvq/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Facebook"
                 className="text-white/70 hover:text-white"
               >
                 <Facebook size={13} />
-              </a>
-              <a
-                href="https://youtube.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="YouTube"
-                className="text-white/70 hover:text-white"
-              >
-                <Youtube size={13} />
               </a>
             </div>
           </div>
@@ -190,20 +181,12 @@ export default function Layout({ children }: LayoutProps) {
               </p>
               <div className="flex gap-3 mt-4">
                 <a
-                  href="https://facebook.com"
+                  href="https://www.facebook.com/share/175bUUUcvq/"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
                 >
                   <Facebook size={14} />
-                </a>
-                <a
-                  href="https://youtube.com"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
-                >
-                  <Youtube size={14} />
                 </a>
               </div>
             </div>

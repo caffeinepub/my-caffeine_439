@@ -4,10 +4,18 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowRight, Bell, CheckCircle2, Search } from "lucide-react";
+import {
+  ArrowRight,
+  Bell,
+  CheckCircle2,
+  Newspaper,
+  Search,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { useState } from "react";
-import { useComplaintStats, useNotices } from "../hooks/useQueries";
+import { useBlobUrl } from "../hooks/useImageUpload";
+import { useComplaintStats, useNews, useNotices } from "../hooks/useQueries";
+import type { News } from "../types/extended";
 
 const COMPLAINT_TYPES = [
   {
@@ -80,11 +88,26 @@ const HOW_IT_WORKS = [
   { step: 4, icon: "✅", title: "আপডেট ও সমাধান", desc: "সমাধানের বিজ্ঞপ্তি পান" },
 ];
 
+function NewsCardImage({ imageId }: { imageId: [] | [string] | undefined }) {
+  const id = imageId && imageId.length > 0 ? imageId[0] : null;
+  const url = useBlobUrl(id);
+  if (!url) return null;
+  return (
+    <img
+      src={url}
+      alt="news"
+      className="w-full h-36 object-cover rounded-lg mb-2"
+      loading="lazy"
+    />
+  );
+}
+
 export default function HomePage() {
   const [searchId, setSearchId] = useState("");
   const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading } = useComplaintStats();
   const { data: notices, isLoading: noticesLoading } = useNotices();
+  const { data: newsList, isLoading: newsLoading } = useNews();
 
   const handleSearch = () => {
     if (searchId.trim()) {
@@ -389,8 +412,79 @@ export default function HomePage() {
         </div>
       </section>
 
+      {/* Recent News Section */}
+      <section className="py-10 px-4 bg-white">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl font-bold text-red-700 flex items-center gap-2">
+              <Newspaper size={22} className="text-red-600" />
+              সাম্প্রতিক খবর ও আপডেট
+            </h2>
+            <Link
+              to="/news"
+              className="text-red-600 text-sm font-bold hover:underline"
+              data-ocid="homepage.news.link"
+            >
+              সব দেখুন →
+            </Link>
+          </div>
+          {newsLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {[1, 2, 3].map((i) => (
+                <Skeleton key={i} className="h-48 rounded-xl" />
+              ))}
+            </div>
+          ) : !newsList || newsList.length === 0 ? (
+            <Card className="shadow-card border-0">
+              <CardContent className="py-10 text-center text-gray-500">
+                <Newspaper size={36} className="mx-auto mb-3 opacity-30" />
+                এই মুহূর্তে কোনো খবর নেই
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {newsList.slice(0, 3).map((news: News, i) => (
+                <motion.div
+                  key={`news-home-${news.title}-${i}`}
+                  initial={{ opacity: 0, y: 15 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.4, delay: i * 0.1 }}
+                >
+                  <Card className="shadow-card border-0 border-t-4 border-t-red-600 h-full">
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        {news.isBreaking && (
+                          <Badge className="bg-red-600 text-white text-xs font-bold">
+                            🔴 ব্রেকিং
+                          </Badge>
+                        )}
+                        <span className="text-xs text-gray-500">
+                          {new Date(
+                            Number(news.createdAt / 1000000n),
+                          ).toLocaleDateString("bn-BD")}
+                        </span>
+                      </div>
+                      {news.imageId && news.imageId.length > 0 && (
+                        <NewsCardImage imageId={news.imageId} />
+                      )}
+                      <h3 className="font-bold text-navy text-sm mb-1 leading-tight">
+                        {news.title}
+                      </h3>
+                      <p className="text-gray-600 text-xs line-clamp-2">
+                        {news.content}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
       {/* How it works */}
-      <section className="py-12 px-4 bg-white">
+      <section className="py-12 px-4 bg-page-bg">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-bold text-blue-900 mb-2 text-center">
             কিভাবে কাজ করে?
@@ -428,7 +522,7 @@ export default function HomePage() {
       </section>
 
       {/* Support Section */}
-      <section className="py-12 px-4 bg-page-bg">
+      <section className="py-12 px-4 bg-white">
         <div className="max-w-7xl mx-auto">
           <h2 className="text-2xl font-bold text-red-700 mb-8 text-center">
             সহায়তা পান
@@ -438,7 +532,9 @@ export default function HomePage() {
               <CardContent className="p-5">
                 <div className="text-2xl mb-2">📞</div>
                 <h3 className="font-bold text-gray-900 text-sm mb-1">হটলাইন</h3>
-                <p className="text-green-700 font-bold text-lg">০১৭০০-০০০০০০</p>
+                <p className="text-green-700 font-bold text-lg">
+                  <a href="tel:01403163378">০১৪০৩-১৬৩৩৭৮</a>
+                </p>
                 <p className="text-xs text-gray-600">
                   রবি-শনি সকাল ৯টা – বিকাল ৫টা
                 </p>
@@ -450,7 +546,15 @@ export default function HomePage() {
                 <h3 className="font-bold text-gray-900 text-sm mb-1">
                   হোয়াটসঅ্যাপ
                 </h3>
-                <p className="text-green-700 font-bold text-lg">০১৭৯৫-৫৫৫৫৫৫</p>
+                <p className="text-green-700 font-bold text-lg">
+                  <a
+                    href="https://wa.me/8801403163378"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    +৮৮০১৪০৩-১৬৩৩৭৮
+                  </a>
+                </p>
                 <p className="text-xs text-gray-600">সবসময় বার্তা পাঠান</p>
               </CardContent>
             </Card>
@@ -460,7 +564,9 @@ export default function HomePage() {
                 <h3 className="font-bold text-gray-900 text-sm mb-1">
                   অফিসের ঠিকানা
                 </h3>
-                <p className="text-sm text-gray-700">৪৫, পুরানা পল্টন, ঢাকা-১০০০</p>
+                <p className="text-sm text-gray-700">
+                  ১১০৪ রোজভিউ প্লাজা, ১৮৫ বীর উত্তম সি আর দত্ত রোড, হাতিরপুল, ঢাকা-১২০৫
+                </p>
                 <p className="text-xs text-gray-600 mt-1">
                   রবি-বৃহঃ, সকাল ৯টা – বিকাল ৫টা
                 </p>

@@ -14,6 +14,7 @@ import ComplaintFormPage from "./pages/ComplaintFormPage";
 import ContactPage from "./pages/ContactPage";
 import FAQPage from "./pages/FAQPage";
 import HomePage from "./pages/HomePage";
+import NewsPage from "./pages/NewsPage";
 import NoticePage from "./pages/NoticePage";
 import TrackingPage from "./pages/TrackingPage";
 
@@ -60,6 +61,12 @@ const noticeRoute = createRoute({
   component: NoticePage,
 });
 
+const newsRoute = createRoute({
+  getParentRoute: () => publicLayoutRoute,
+  path: "/news",
+  component: NewsPage,
+});
+
 const faqRoute = createRoute({
   getParentRoute: () => publicLayoutRoute,
   path: "/faq",
@@ -96,6 +103,7 @@ const routeTree = rootRoute.addChildren([
     complaintFormRoute,
     trackingRoute,
     noticeRoute,
+    newsRoute,
     faqRoute,
     contactRoute,
   ]),
