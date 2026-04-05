@@ -25,6 +25,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import {
   AlertCircle,
   Eye,
+  FileText,
   ImageIcon,
   Loader2,
   LogOut,
@@ -49,6 +50,7 @@ import {
 import { isPasswordAdmin } from "./AdminLoginPage";
 
 const ADMIN_SESSION_KEY = "bgws_admin_session";
+const ADMIN_PASSWORD = "@dminBGWS2001";
 
 const PRIORITY_LABELS: Record<string, string> = {
   normal: "সাধারণ",
@@ -87,11 +89,43 @@ interface NewsFormState {
   imageId: string | null;
 }
 
+interface ComplaintFormState {
+  complainantName: string;
+  mobile: string;
+  companyName: string;
+  workAddress: string;
+  complaintType: string;
+  subject: string;
+  details: string;
+  incidentDate: string;
+  priority: string;
+  workerId: string;
+}
+
+const defaultComplaintForm: ComplaintFormState = {
+  complainantName: "",
+  mobile: "",
+  companyName: "",
+  workAddress: "",
+  complaintType: "",
+  subject: "",
+  details: "",
+  incidentDate: "",
+  priority: "normal",
+  workerId: "",
+};
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate();
   const { clear, identity } = useInternetIdentity();
   const { data: isAdmin, isLoading: adminChecking } = useIsAdmin();
-  const { data: complaints, isLoading } = useAllComplaints();
+  const {
+    data: complaints,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = useAllComplaints();
   const { data: stats } = useComplaintStats();
   const { actor } = useActor();
   const queryClient = useQueryClient();
@@ -127,6 +161,11 @@ export default function AdminDashboardPage() {
   });
   const [newsImagePreview, setNewsImagePreview] = useState<string | null>(null);
   const newsFileRef = useRef<HTMLInputElement>(null);
+
+  // Complaint form modal state
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [complaintForm, setComplaintForm] =
+    useState<ComplaintFormState>(defaultComplaintForm);
 
   const { upload: uploadImage, uploading: uploadingImage } = useImageUpload();
 
@@ -205,7 +244,10 @@ export default function AdminDashboardPage() {
     if (newsFileRef.current) newsFileRef.current.value = "";
   };
 
-  const ADMIN_PASSWORD = "@dminBGWS2001";
+  const resetComplaintModal = () => {
+    setShowComplaintModal(false);
+    setComplaintForm(defaultComplaintForm);
+  };
 
   const addNoticeMutation = useMutation({
     mutationFn: async () => {
@@ -243,11 +285,10 @@ export default function AdminDashboardPage() {
           ? ([newsForm.imageId] as [string])
           : ([] as []),
       };
-      const actorAnyNews = actor as any;
       if (hasPasswordSession) {
-        await actorAnyNews.addNewsWithPassword(ADMIN_PASSWORD, newsInput);
+        await actor.addNewsWithPassword(ADMIN_PASSWORD, newsInput as any);
       } else {
-        await actorAnyNews.addNews(newsInput);
+        await actor.addNews(newsInput as any);
       }
     },
     onSuccess: () => {
@@ -261,14 +302,13 @@ export default function AdminDashboardPage() {
   const deleteComplaintMutation = useMutation({
     mutationFn: async (complaintNumber: string) => {
       if (!actor) throw new Error("No actor");
-      const actorAny = actor as any;
       if (hasPasswordSession) {
-        await actorAny.deleteComplaintWithPassword(
+        await (actor as any).deleteComplaintWithPassword(
           ADMIN_PASSWORD,
           complaintNumber,
         );
       } else {
-        await actorAny.deleteComplaint(complaintNumber);
+        await (actor as any).deleteComplaint(complaintNumber);
       }
     },
     onSuccess: () => {
@@ -279,6 +319,59 @@ export default function AdminDashboardPage() {
     },
     onError: () => toast.error("অভিযোগ মুছতে সমস্যা হয়েছে"),
   });
+
+  const addComplaintMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("No actor");
+      const priorityMap: Record<string, Priority> = {
+        normal: Priority.normal,
+        urgent: Priority.urgent,
+        veryUrgent: Priority.veryUrgent,
+      };
+      const complaintInput = {
+        attachmentIds: [] as string[],
+        workerId: complaintForm.workerId || undefined,
+        subject: complaintForm.subject,
+        complaintType: complaintForm.complaintType,
+        workAddress: complaintForm.workAddress,
+        complainantName: complaintForm.complainantName,
+        companyName: complaintForm.companyName,
+        details: complaintForm.details,
+        priority: priorityMap[complaintForm.priority] ?? Priority.normal,
+        mobile: complaintForm.mobile,
+        incidentDate: complaintForm.incidentDate,
+      };
+      if (hasPasswordSession) {
+        return await (actor as any).submitComplaintWithPassword(
+          ADMIN_PASSWORD,
+          complaintInput,
+        );
+      }
+      return await actor.submitComplaint(complaintInput);
+    },
+    onSuccess: (complaintNumber: string) => {
+      toast.success(`অভিযোগ যোগ হয়েছে — নম্বর: ${complaintNumber}`, {
+        duration: 6000,
+      });
+      resetComplaintModal();
+      queryClient.invalidateQueries({ queryKey: ["allComplaints"] });
+      queryClient.invalidateQueries({ queryKey: ["complaintStats"] });
+    },
+    onError: (err) => {
+      console.error("submitComplaint error:", err);
+      toast.error("অভিযোগ যোগ করা সম্ভব হয়নি");
+    },
+  });
+
+  const isComplaintFormValid =
+    complaintForm.complainantName.trim() &&
+    complaintForm.mobile.trim() &&
+    complaintForm.companyName.trim() &&
+    complaintForm.workAddress.trim() &&
+    complaintForm.complaintType &&
+    complaintForm.subject.trim() &&
+    complaintForm.details.trim() &&
+    complaintForm.incidentDate.trim();
 
   const filtered = useMemo(() => {
     if (!complaints) return [];
@@ -321,7 +414,16 @@ export default function AdminDashboardPage() {
             <h1 className="font-bold text-lg">অ্যাডমিন ড্যাশবোর্ড</h1>
             <p className="text-white/60 text-xs">বাংলাদেশ গার্মেন্ট শ্রমিক সংহতি</p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <Button
+              onClick={() => setShowComplaintModal(true)}
+              size="sm"
+              className="bg-indigo-600 text-white hover:bg-indigo-700 text-xs"
+              data-ocid="admin_dashboard.add_complaint.button"
+            >
+              <FileText size={14} className="mr-1" />
+              অভিযোগ যোগ
+            </Button>
             <Button
               onClick={() => setShowNoticeModal(true)}
               size="sm"
@@ -483,6 +585,24 @@ export default function AdminDashboardPage() {
                   <Skeleton key={i} className="h-14 rounded" />
                 ))}
               </div>
+            ) : isError ? (
+              <div
+                className="py-16 text-center"
+                data-ocid="admin_dashboard.error_state"
+              >
+                <AlertCircle size={40} className="mx-auto mb-3 text-red-400" />
+                <p className="text-red-600 font-medium mb-1">অভিযোগ লোড হয়নি</p>
+                <p className="text-muted-foreground text-xs mb-4">
+                  {String(error)}
+                </p>
+                <Button
+                  onClick={() => refetch()}
+                  className="bg-navy text-white hover:bg-navy/90"
+                  size="sm"
+                >
+                  আবার চেষ্টা করুন
+                </Button>
+              </div>
             ) : filtered.length === 0 ? (
               <div
                 className="py-16 text-center"
@@ -493,6 +613,15 @@ export default function AdminDashboardPage() {
                   className="mx-auto mb-3 text-muted-foreground/30"
                 />
                 <p className="text-muted-foreground">কোনো অভিযোগ পাওয়া যায়নি</p>
+                <Button
+                  onClick={() => setShowComplaintModal(true)}
+                  className="mt-4 bg-indigo-600 text-white hover:bg-indigo-700"
+                  size="sm"
+                  data-ocid="admin_dashboard.empty_state.add_complaint.button"
+                >
+                  <FileText size={14} className="mr-1" />
+                  প্রথম অভিযোগ যোগ করুন
+                </Button>
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -650,6 +779,254 @@ export default function AdminDashboardPage() {
                 <Trash2 size={16} className="mr-1" />
               )}
               মুছে ফেলুন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Complaint Modal */}
+      <Dialog
+        open={showComplaintModal}
+        onOpenChange={(open) => {
+          if (!open) resetComplaintModal();
+          else setShowComplaintModal(true);
+        }}
+      >
+        <DialogContent
+          className="max-w-2xl max-h-[90vh] overflow-y-auto"
+          data-ocid="admin_dashboard.add_complaint.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-navy flex items-center gap-2">
+              <FileText size={18} className="text-indigo-600" />
+              নতুন অভিযোগ যোগ করুন
+            </DialogTitle>
+            <p className="text-xs text-muted-foreground pt-1">
+              ফোনে বা সরাসরি গৃহীত অভিযোগ এখানে নথিভুক্ত করুন
+            </p>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {/* Row 1: Name + Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  অভিযোগকারীর নাম <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.complainantName}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({
+                      ...p,
+                      complainantName: e.target.value,
+                    }))
+                  }
+                  placeholder="পূর্ণ নাম লিখুন"
+                  data-ocid="admin_dashboard.complaint_name.input"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  মোবাইল নম্বর <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.mobile}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({ ...p, mobile: e.target.value }))
+                  }
+                  placeholder="০১XXXXXXXXX"
+                  type="tel"
+                  data-ocid="admin_dashboard.complaint_mobile.input"
+                />
+              </div>
+            </div>
+
+            {/* Row 2: Company + Work Address */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  কারখানার নাম <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.companyName}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({
+                      ...p,
+                      companyName: e.target.value,
+                    }))
+                  }
+                  placeholder="কারখানার নাম লিখুন"
+                  data-ocid="admin_dashboard.complaint_company.input"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  কর্মস্থলের ঠিকানা <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.workAddress}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({
+                      ...p,
+                      workAddress: e.target.value,
+                    }))
+                  }
+                  placeholder="এলাকা, জেলা"
+                  data-ocid="admin_dashboard.complaint_address.input"
+                />
+              </div>
+            </div>
+
+            {/* Row 3: Complaint Type + Priority */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  অভিযোগের ধরন <span className="text-red-500">*</span>
+                </Label>
+                <Select
+                  value={complaintForm.complaintType}
+                  onValueChange={(v) =>
+                    setComplaintForm((p) => ({ ...p, complaintType: v }))
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    data-ocid="admin_dashboard.complaint_type.select"
+                  >
+                    <SelectValue placeholder="ধরন বেছে নিন" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(COMPLAINT_TYPE_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  অগ্রাধিকার
+                </Label>
+                <Select
+                  value={complaintForm.priority}
+                  onValueChange={(v) =>
+                    setComplaintForm((p) => ({ ...p, priority: v }))
+                  }
+                >
+                  <SelectTrigger
+                    className="w-full"
+                    data-ocid="admin_dashboard.complaint_priority.select"
+                  >
+                    <SelectValue placeholder="অগ্রাধিকার" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(PRIORITY_LABELS).map(([k, v]) => (
+                      <SelectItem key={k} value={k}>
+                        {v}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* Row 4: Subject + Incident Date */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  বিষয় <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.subject}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({ ...p, subject: e.target.value }))
+                  }
+                  placeholder="অভিযোগের সংক্ষিপ্ত বিষয়"
+                  data-ocid="admin_dashboard.complaint_subject.input"
+                />
+              </div>
+              <div>
+                <Label className="text-sm font-semibold mb-1.5 block">
+                  ঘটনার তারিখ <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  value={complaintForm.incidentDate}
+                  onChange={(e) =>
+                    setComplaintForm((p) => ({
+                      ...p,
+                      incidentDate: e.target.value,
+                    }))
+                  }
+                  placeholder="যেমন: ২০২৫-০৩-১৫"
+                  type="date"
+                  data-ocid="admin_dashboard.complaint_date.input"
+                />
+              </div>
+            </div>
+
+            {/* Details */}
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                বিস্তারিত বিবরণ <span className="text-red-500">*</span>
+              </Label>
+              <Textarea
+                value={complaintForm.details}
+                onChange={(e) =>
+                  setComplaintForm((p) => ({ ...p, details: e.target.value }))
+                }
+                placeholder="অভিযোগের বিস্তারিত বিবরণ লিখুন..."
+                rows={4}
+                data-ocid="admin_dashboard.complaint_details.textarea"
+              />
+            </div>
+
+            {/* Worker ID (optional) */}
+            <div>
+              <Label className="text-sm font-semibold mb-1.5 block">
+                শ্রমিক আইডি{" "}
+                <span className="text-muted-foreground font-normal text-xs">
+                  (ঐচ্ছিক)
+                </span>
+              </Label>
+              <Input
+                value={complaintForm.workerId}
+                onChange={(e) =>
+                  setComplaintForm((p) => ({
+                    ...p,
+                    workerId: e.target.value,
+                  }))
+                }
+                placeholder="শ্রমিক পরিচয় নম্বর (যদি থাকে)"
+                data-ocid="admin_dashboard.complaint_worker_id.input"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={resetComplaintModal}
+              data-ocid="admin_dashboard.add_complaint.cancel_button"
+            >
+              বাতিল
+            </Button>
+            <Button
+              onClick={() => addComplaintMutation.mutate()}
+              disabled={
+                addComplaintMutation.isPending ||
+                !isComplaintFormValid ||
+                !actor
+              }
+              className="bg-indigo-600 hover:bg-indigo-700 text-white"
+              data-ocid="admin_dashboard.add_complaint.submit_button"
+            >
+              {addComplaintMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin mr-1" />
+              ) : (
+                <FileText size={16} className="mr-1" />
+              )}
+              অভিযোগ নথিভুক্ত করুন
             </Button>
           </DialogFooter>
         </DialogContent>

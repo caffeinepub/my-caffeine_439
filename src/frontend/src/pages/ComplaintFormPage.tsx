@@ -45,7 +45,7 @@ const COMPLAINT_TYPES = [
 ];
 
 export default function ComplaintFormPage() {
-  const { actor } = useActor();
+  const { actor, isFetching: actorLoading } = useActor();
   const queryClient = useQueryClient();
   const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
   const [submittedNumber, setSubmittedNumber] = useState("");
@@ -220,7 +220,9 @@ export default function ComplaintFormPage() {
         {mutation.isError && (
           <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-3 text-red-700 text-sm">
             <AlertCircle size={18} />
-            অভিযোগ জমা দেওয়া সম্ভব হয়নি। আবার চেষ্টা করুন।
+            {(mutation.error as Error)?.message === "সার্ভারের সাথে সংযোগ হচ্ছে না"
+              ? "সার্ভারের সাথে সংযোগ হচ্ছে না — পেজ রিফ্রেশ করুন"
+              : "অভিযোগ জমা দেওয়া সম্ভব হয়নি। আবার চেষ্টা করুন।"}
           </div>
         )}
 
@@ -592,7 +594,7 @@ export default function ComplaintFormPage() {
               {/* Submit */}
               <Button
                 type="submit"
-                disabled={mutation.isPending}
+                disabled={mutation.isPending || actorLoading}
                 className="w-full h-14 text-lg font-bold bg-red-primary hover:bg-red-primary/90 text-white rounded-xl"
                 data-ocid="complaint_form.submit_button"
               >
@@ -600,6 +602,11 @@ export default function ComplaintFormPage() {
                   <>
                     <Loader2 size={22} className="mr-2 animate-spin" />
                     জমা দেওয়া হচ্ছে...
+                  </>
+                ) : actorLoading ? (
+                  <>
+                    <Loader2 size={22} className="mr-2 animate-spin" />
+                    সংযোগ হচ্ছে...
                   </>
                 ) : (
                   "অভিযোগ জমা দিন"

@@ -9,7 +9,7 @@ export type { News };
 const ADMIN_SESSION_KEY = "bgws_admin_session";
 const ADMIN_PASSWORD = "@dminBGWS2001";
 
-function isPasswordAdmin(): boolean {
+export function isPasswordAdmin(): boolean {
   return sessionStorage.getItem(ADMIN_SESSION_KEY) === "true";
 }
 
@@ -57,7 +57,7 @@ export function useNews() {
 }
 
 export function useComplaintByNumber(complaintNumber: string) {
-  const { actor } = useActor();
+  const { actor, isFetching } = useActor();
   return useQuery<Complaint | null>({
     queryKey: ["complaint", complaintNumber],
     queryFn: async () => {
@@ -73,11 +73,13 @@ export function useComplaintByNumber(complaintNumber: string) {
         ) {
           return null;
         }
-        return null;
+        // Re-throw other errors so React Query can retry
+        throw err;
       }
     },
-    enabled: !!actor && !!complaintNumber,
-    retry: false,
+    enabled: !!actor && !!complaintNumber && !isFetching,
+    retry: 3,
+    retryDelay: 1000,
   });
 }
 
@@ -87,22 +89,20 @@ export function useAllComplaints() {
   return useQuery<Complaint[]>({
     queryKey: ["allComplaints", pwAdmin],
     queryFn: async () => {
-      if (!actor) return [];
-      try {
-        // If password admin, use password-based function (works with anonymous actor)
-        if (pwAdmin) {
-          return await actor.getAllComplaintsWithPassword(ADMIN_PASSWORD);
-        }
-        // Otherwise use regular getAllComplaints (for Internet Identity admins)
-        return await actor.getAllComplaints();
-      } catch (err) {
-        console.error("getAllComplaints error:", err);
-        return [];
+      if (!actor) throw new Error("Actor not ready");
+      // Password admin: use password-based function (works with anonymous actor)
+      if (pwAdmin) {
+        return await actor.getAllComplaintsWithPassword(ADMIN_PASSWORD);
       }
+      // II admin: use authenticated getAllComplaints
+      return await actor.getAllComplaints();
     },
-    // For password admin, only need actor (no isFetching check needed since it's public)
-    enabled: pwAdmin ? !!actor : !!actor && !isFetching,
+    // For password admin: actor just needs to be ready (no auth needed)
+    // For II admin: also wait for identity/auth to complete
+    enabled: !!actor && !isFetching,
     staleTime: 10000,
+    retry: 3,
+    retryDelay: 1500,
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
@@ -122,7 +122,7 @@ export function useIsAdmin() {
         return false;
       }
     },
-    enabled: !isFetching,
+    enabled: pwAdmin ? true : !isFetching,
     staleTime: 60000,
   });
 }

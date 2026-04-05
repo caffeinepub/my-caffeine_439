@@ -632,4 +632,25 @@ actor {
     complaints.remove(complaintNumber);
   };
 
+
+  public shared func submitComplaintWithPassword(password : Text, input : ComplaintInput) : async Text {
+    checkAdminPassword(password);
+    let complaintNumber = generateComplaintNumber();
+    let now = Time.now();
+    let complaint : Complaint = {
+      input with
+      complaintNumber;
+      status = #pending;
+      statusDescription = null;
+      createdAt = now;
+      updatedAt = now;
+      officer = null;
+      department = null;
+      officerRemarks = null;
+      nextStep = null;
+    };
+    complaints.add(complaintNumber, complaint);
+    complaintNumber;
+  };
+
 };

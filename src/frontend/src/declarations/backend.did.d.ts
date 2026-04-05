@@ -73,12 +73,27 @@ export interface Notice {
   'title' : string,
   'content' : string,
   'isImportant' : boolean,
+  'imageId' : [] | [string],
   'createdAt' : Time,
 }
 export interface NoticeInput {
   'title' : string,
   'content' : string,
   'isImportant' : boolean,
+  'imageId' : [] | [string],
+}
+export interface NewsInput {
+  'title' : string,
+  'content' : string,
+  'imageId' : [] | [string],
+  'isBreaking' : boolean,
+}
+export interface News {
+  'title' : string,
+  'content' : string,
+  'imageId' : [] | [string],
+  'isBreaking' : boolean,
+  'createdAt' : Time,
 }
 export type Priority = { 'normal' : null } |
   { 'urgent' : null } |
@@ -121,20 +136,25 @@ export interface _SERVICE {
   >,
   '_caffeineStorageUpdateGatewayPrincipals' : ActorMethod<[], undefined>,
   '_initializeAccessControlWithSecret' : ActorMethod<[string], undefined>,
+  // Notice (II auth)
   'addNotice' : ActorMethod<[NoticeInput], string>,
-  'addOfficerRemarks' : ActorMethod<[string, string, string], undefined>,
-  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'assignOfficer' : ActorMethod<[string, string, string], undefined>,
   'deleteNotice' : ActorMethod<[string], undefined>,
-  'getAllComplaints' : ActorMethod<[], Array<Complaint>>,
-  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
-  'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getComplaintByNumber' : ActorMethod<[string], Complaint>,
-  'getComplaintStats' : ActorMethod<[], ComplaintStats>,
   'getNotices' : ActorMethod<[], Array<Notice>>,
-  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
-  'isCallerAdmin' : ActorMethod<[], boolean>,
-  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
+  // Notice (password auth)
+  'addNoticeWithPassword' : ActorMethod<[string, NoticeInput], string>,
+  'deleteNoticeWithPassword' : ActorMethod<[string, string], undefined>,
+  // News (II auth)
+  'addNews' : ActorMethod<[NewsInput], string>,
+  'deleteNews' : ActorMethod<[string], undefined>,
+  'getNews' : ActorMethod<[], Array<News>>,
+  // News (password auth)
+  'addNewsWithPassword' : ActorMethod<[string, NewsInput], string>,
+  'deleteNewsWithPassword' : ActorMethod<[string, string], undefined>,
+  // Complaint management (II auth)
+  'addOfficerRemarks' : ActorMethod<[string, string, string], undefined>,
+  'assignOfficer' : ActorMethod<[string, string, string], undefined>,
+  'deleteComplaint' : ActorMethod<[string], undefined>,
+  'getAllComplaints' : ActorMethod<[], Array<Complaint>>,
   'submitComplaint' : ActorMethod<[ComplaintInput], string>,
   'updateComplaint' : ActorMethod<[string, ComplaintEditInput], undefined>,
   'updateComplaintStatus' : ActorMethod<[string, Status], undefined>,
@@ -142,6 +162,37 @@ export interface _SERVICE {
     [string, Status, string],
     undefined
   >,
+  // Complaint management (password auth)
+  'getAllComplaintsWithPassword' : ActorMethod<[string], Array<Complaint>>,
+  'getComplaintStatsWithPassword' : ActorMethod<[string], ComplaintStats>,
+  'updateComplaintStatusWithPassword' : ActorMethod<
+    [string, string, Status, string],
+    undefined
+  >,
+  'updateComplaintWithPassword' : ActorMethod<
+    [string, string, ComplaintEditInput],
+    undefined
+  >,
+  'assignOfficerWithPassword' : ActorMethod<
+    [string, string, string, string],
+    undefined
+  >,
+  'addOfficerRemarksWithPassword' : ActorMethod<
+    [string, string, string, string],
+    undefined
+  >,
+  'deleteComplaintWithPassword' : ActorMethod<[string, string], undefined>,
+  'submitComplaintWithPassword' : ActorMethod<[string, ComplaintInput], string>,
+  // Public
+  'getComplaintByNumber' : ActorMethod<[string], Complaint>,
+  'getComplaintStats' : ActorMethod<[], ComplaintStats>,
+  // User/access control
+  'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
+  'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
+  'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getUserProfile' : ActorMethod<[Principal], [] | [UserProfile]>,
+  'isCallerAdmin' : ActorMethod<[], boolean>,
+  'saveCallerUserProfile' : ActorMethod<[UserProfile], undefined>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

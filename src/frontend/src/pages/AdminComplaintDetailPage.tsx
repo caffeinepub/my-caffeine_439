@@ -66,7 +66,11 @@ export default function AdminComplaintDetailPage() {
   const { actor } = useActor();
   const queryClient = useQueryClient();
 
-  const { data: complaint, isLoading } = useComplaintByNumber(complaintNumber);
+  const {
+    data: complaint,
+    isLoading,
+    isError,
+  } = useComplaintByNumber(complaintNumber);
 
   // Status update state
   const [newStatus, setNewStatus] = useState<Status | "">("");
@@ -289,19 +293,28 @@ export default function AdminComplaintDetailPage() {
         className="min-h-screen bg-page-bg flex items-center justify-center"
         data-ocid="complaint_detail.loading_state"
       >
-        <Loader2 size={40} className="animate-spin text-green-primary" />
+        <div className="text-center space-y-3">
+          <Loader2
+            size={40}
+            className="animate-spin text-green-primary mx-auto"
+          />
+          <p className="text-sm text-muted-foreground">অভিযোগ লোড হচ্ছে...</p>
+        </div>
       </div>
     );
   }
 
-  if (!complaint) {
+  if (isError || !complaint) {
     return (
       <div className="min-h-screen bg-page-bg flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-muted-foreground mb-4">অভিযোগ পাওয়া যায়নি</p>
+        <div className="text-center space-y-4">
+          <p className="text-red-600 font-medium">অভিযোগ লোড করা সম্ভব হয়নি</p>
+          <p className="text-muted-foreground text-sm">
+            অভিযোগ নম্বর: {complaintNumber}
+          </p>
           <Link
             to="/admin/dashboard"
-            className="text-navy font-semibold hover:underline"
+            className="block text-navy font-semibold hover:underline"
           >
             ড্যাশবোর্ডে ফিরুন
           </Link>
