@@ -204,17 +204,24 @@ export default function AdminDashboardPage() {
     if (newsFileRef.current) newsFileRef.current.value = "";
   };
 
+  const ADMIN_PASSWORD = "@dminBGWS2001";
+
   const addNoticeMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("No actor");
-      // Cast to any to support extended NoticeInput with imageId
-      const actorAny = actor as any;
-      await actorAny.addNotice({
+      const noticeInput = {
         title: noticeForm.title,
         content: noticeForm.content,
         isImportant: noticeForm.isImportant,
-        imageId: noticeForm.imageId ? [noticeForm.imageId] : [],
-      });
+        imageId: noticeForm.imageId
+          ? ([noticeForm.imageId] as [string])
+          : ([] as []),
+      };
+      if (hasPasswordSession) {
+        await actor.addNoticeWithPassword(ADMIN_PASSWORD, noticeInput);
+      } else {
+        await actor.addNotice(noticeInput);
+      }
     },
     onSuccess: () => {
       toast.success("নোটিশ যোগ দেওয়া হয়েছে");
@@ -227,14 +234,20 @@ export default function AdminDashboardPage() {
   const addNewsMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("No actor");
-      // Cast to any to support new addNews method
-      const actorAny = actor as any;
-      await actorAny.addNews({
+      const newsInput = {
         title: newsForm.title,
         content: newsForm.content,
         isBreaking: newsForm.isBreaking,
-        imageId: newsForm.imageId ? [newsForm.imageId] : [],
-      });
+        imageId: newsForm.imageId
+          ? ([newsForm.imageId] as [string])
+          : ([] as []),
+      };
+      const actorAnyNews = actor as any;
+      if (hasPasswordSession) {
+        await actorAnyNews.addNewsWithPassword(ADMIN_PASSWORD, newsInput);
+      } else {
+        await actorAnyNews.addNews(newsInput);
+      }
     },
     onSuccess: () => {
       toast.success("খবর প্রকাশিত হয়েছে");

@@ -127,14 +127,25 @@ export default function AdminComplaintDetailPage() {
     }
   }, [complaint]);
 
+  const ADMIN_PASSWORD = "@dminBGWS2001";
+
   const statusMutation = useMutation({
     mutationFn: async () => {
       if (!actor || !newStatus) throw new Error("Missing data");
-      await actor.updateComplaintStatusWithDescription(
-        complaintNumber,
-        newStatus as Status,
-        statusDescription,
-      );
+      if (hasPasswordSession) {
+        await actor.updateComplaintStatusWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+          newStatus as Status,
+          statusDescription,
+        );
+      } else {
+        await actor.updateComplaintStatusWithDescription(
+          complaintNumber,
+          newStatus as Status,
+          statusDescription,
+        );
+      }
     },
     onSuccess: () => {
       toast.success("স্ট্যাটাস আপডেট হয়েছে");
@@ -151,7 +162,16 @@ export default function AdminComplaintDetailPage() {
   const officerMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("No actor");
-      await actor.assignOfficer(complaintNumber, officer, department);
+      if (hasPasswordSession) {
+        await actor.assignOfficerWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+          officer,
+          department,
+        );
+      } else {
+        await actor.assignOfficer(complaintNumber, officer, department);
+      }
     },
     onSuccess: () => {
       toast.success("কর্মকর্তা নিয়োগ হয়েছে");
@@ -165,7 +185,16 @@ export default function AdminComplaintDetailPage() {
   const remarksMutation = useMutation({
     mutationFn: async () => {
       if (!actor) throw new Error("No actor");
-      await actor.addOfficerRemarks(complaintNumber, remarks, nextStep);
+      if (hasPasswordSession) {
+        await actor.addOfficerRemarksWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+          remarks,
+          nextStep,
+        );
+      } else {
+        await actor.addOfficerRemarks(complaintNumber, remarks, nextStep);
+      }
     },
     onSuccess: () => {
       toast.success("মন্তব্য সংরক্ষণ হয়েছে");
@@ -196,7 +225,15 @@ export default function AdminComplaintDetailPage() {
         officerRemarks: editForm.officerRemarks || undefined,
         nextStep: editForm.nextStep || undefined,
       };
-      await actor.updateComplaint(complaintNumber, input);
+      if (hasPasswordSession) {
+        await actor.updateComplaintWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+          input,
+        );
+      } else {
+        await actor.updateComplaint(complaintNumber, input);
+      }
     },
     onSuccess: () => {
       toast.success("অভিযোগ সম্পাদনা হয়েছে");

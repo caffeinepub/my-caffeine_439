@@ -6,6 +6,13 @@ import type { News } from "../types/extended";
 
 export type { News };
 
+const ADMIN_SESSION_KEY = "bgws_admin_session";
+const ADMIN_PASSWORD = "@dminBGWS2001";
+
+function isPasswordAdmin(): boolean {
+  return sessionStorage.getItem(ADMIN_SESSION_KEY) === "true";
+}
+
 export function useComplaintStats() {
   const { actor } = useActor();
   return useQuery<ComplaintStats>({
@@ -40,12 +47,7 @@ export function useNews() {
     queryFn: async () => {
       if (!actor) return [];
       try {
-        // getNews will be available after backend update
-        const actorAny = actor as any;
-        if (typeof actorAny.getNews === "function") {
-          return (await actorAny.getNews()) as News[];
-        }
-        return [];
+        return (await actor.getNews()) as News[];
       } catch {
         return [];
       }
@@ -56,29 +58,50 @@ export function useNews() {
 }
 
 export function useComplaintByNumber(complaintNumber: string) {
-  const { actor, isFetching } = useActor();
+  const { actor } = useActor();
   return useQuery<Complaint | null>({
     queryKey: ["complaint", complaintNumber],
     queryFn: async () => {
       if (!actor || !complaintNumber) return null;
       try {
-        return await actor.getComplaintByNumber(complaintNumber);
-      } catch {
+        const result = await actor.getComplaintByNumber(complaintNumber);
+        return result ?? null;
+      } catch (err) {
+        // If complaint not found, return null
+        const errMsg = String(err);
+        if (
+          errMsg.includes("not found") ||
+          errMsg.includes("Complaint not found")
+        ) {
+          return null;
+        }
         return null;
       }
     },
-    enabled: !!actor && !isFetching && !!complaintNumber,
+    // getComplaintByNumber is now public - no need to wait for auth
+    enabled: !!actor && !!complaintNumber,
     retry: false,
   });
 }
 
 export function useAllComplaints() {
   const { actor, isFetching } = useActor();
+  const pwAdmin = isPasswordAdmin();
   return useQuery<Complaint[]>({
-    queryKey: ["allComplaints"],
+    queryKey: ["allComplaints", pwAdmin],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.getAllComplaints();
+      try {
+        // If password admin, use password-based function
+        if (pwAdmin) {
+          return await actor.getAllComplaintsWithPassword(ADMIN_PASSWORD);
+        }
+        // Otherwise use regular getAllComplaints (for Internet Identity admins)
+        return await actor.getAllComplaints();
+      } catch (err) {
+        console.error("getAllComplaints error:", err);
+        return [];
+      }
     },
     enabled: !!actor && !isFetching,
     staleTime: 10000,
@@ -87,13 +110,20 @@ export function useAllComplaints() {
 
 export function useIsAdmin() {
   const { actor, isFetching } = useActor();
+  const pwAdmin = isPasswordAdmin();
   return useQuery<boolean>({
-    queryKey: ["isAdmin"],
+    queryKey: ["isAdmin", pwAdmin],
     queryFn: async () => {
+      // Password admin is always considered admin
+      if (pwAdmin) return true;
       if (!actor) return false;
-      return actor.isCallerAdmin();
+      try {
+        return await actor.isCallerAdmin();
+      } catch {
+        return false;
+      }
     },
-    enabled: !!actor && !isFetching,
+    enabled: !isFetching,
     staleTime: 60000,
   });
 }

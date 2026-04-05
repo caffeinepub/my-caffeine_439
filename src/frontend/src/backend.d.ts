@@ -117,16 +117,24 @@ export enum UserRole {
 export interface backendInterface {
     addNotice(input: NoticeInput): Promise<string>;
     addNews(input: NewsInput): Promise<string>;
+    addNoticeWithPassword(password: string, input: NoticeInput): Promise<string>;
+    addNewsWithPassword(password: string, input: NewsInput): Promise<string>;
     addOfficerRemarks(complaintNumber: string, remarks: string, nextStep: string): Promise<void>;
+    addOfficerRemarksWithPassword(password: string, complaintNumber: string, remarks: string, nextStep: string): Promise<void>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     assignOfficer(complaintNumber: string, officer: string, department: string): Promise<void>;
+    assignOfficerWithPassword(password: string, complaintNumber: string, officer: string, department: string): Promise<void>;
     deleteNotice(noticeId: string): Promise<void>;
+    deleteNoticeWithPassword(password: string, noticeId: string): Promise<void>;
     deleteNews(newsId: string): Promise<void>;
+    deleteNewsWithPassword(password: string, newsId: string): Promise<void>;
     getAllComplaints(): Promise<Array<Complaint>>;
+    getAllComplaintsWithPassword(password: string): Promise<Array<Complaint>>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
     getComplaintByNumber(complaintNumber: string): Promise<Complaint>;
     getComplaintStats(): Promise<ComplaintStats>;
+    getComplaintStatsWithPassword(password: string): Promise<ComplaintStats>;
     getNotices(): Promise<Array<Notice>>;
     getNews(): Promise<Array<News>>;
     getUserProfile(user: Principal): Promise<UserProfile | null>;
@@ -134,6 +142,8 @@ export interface backendInterface {
     saveCallerUserProfile(profile: UserProfile): Promise<void>;
     submitComplaint(input: ComplaintInput): Promise<string>;
     updateComplaint(complaintNumber: string, input: ComplaintEditInput): Promise<void>;
+    updateComplaintWithPassword(password: string, complaintNumber: string, input: ComplaintEditInput): Promise<void>;
     updateComplaintStatus(complaintNumber: string, newStatus: Status): Promise<void>;
     updateComplaintStatusWithDescription(complaintNumber: string, newStatus: Status, description: string): Promise<void>;
+    updateComplaintStatusWithPassword(password: string, complaintNumber: string, newStatus: Status, description: string): Promise<void>;
 }

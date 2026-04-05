@@ -210,15 +210,6 @@ actor {
     "BGWS" # pad4(complaintCounter);
   };
 
-  // Password-based admin access
-  let ADMIN_PASSWORD_HASH : Text = "@dminBGWS2001";
-
-  func checkAdminPassword(password : Text) {
-    if (password != ADMIN_PASSWORD_HASH) {
-      Runtime.trap("Unauthorized: Invalid admin password");
-    };
-  };
-
   // User Profile Management
   public query ({ caller }) func getCallerUserProfile() : async ?UserProfile {
     if (not (AccessControl.hasPermission(accessControlState, caller, #user))) {
@@ -261,7 +252,10 @@ actor {
     complaintNumber;
   };
 
-  public query func getComplaintByNumber(complaintNumber : Text) : async Complaint {
+  public query ({ caller }) func getComplaintByNumber(complaintNumber : Text) : async Complaint {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can view complaint details");
+    };
     switch (complaints.get(complaintNumber)) {
       case (null) { Runtime.trap("Complaint not found") };
       case (?complaint) { complaint };
@@ -459,157 +453,4 @@ actor {
     };
     newsItems.remove(newsId);
   };
-
-  // ============================================================
-  // Password-based admin functions (for password login admins)
-  // ============================================================
-
-  public query func getAllComplaintsWithPassword(password : Text) : async [Complaint] {
-    checkAdminPassword(password);
-    complaints.values().toArray().sort();
-  };
-
-  public query func getComplaintStatsWithPassword(password : Text) : async ComplaintStats {
-    checkAdminPassword(password);
-    var total = 0;
-    var pending = 0;
-    var resolved = 0;
-    var urgent = 0;
-
-    for (complaint in complaints.values()) {
-      total += 1;
-      switch (complaint.status) {
-        case (#pending) { pending += 1 };
-        case (#resolved) { resolved += 1 };
-        case (_) {};
-      };
-      switch (complaint.priority) {
-        case (#urgent) { urgent += 1 };
-        case (#veryUrgent) { urgent += 1 };
-        case (_) {};
-      };
-    };
-
-    { total; pending; resolved; urgent };
-  };
-
-  public shared func updateComplaintStatusWithPassword(password : Text, complaintNumber : Text, newStatus : Complaint.Status, description : Text) : async () {
-    checkAdminPassword(password);
-    let complaint = switch (complaints.get(complaintNumber)) {
-      case (null) { Runtime.trap("Complaint not found") };
-      case (?c) { c };
-    };
-    let updatedComplaint : Complaint = {
-      complaint with
-      status = newStatus;
-      statusDescription = if (description == "") { null } else { ?description };
-      updatedAt = Time.now();
-    };
-    complaints.add(complaintNumber, updatedComplaint);
-  };
-
-  public shared func updateComplaintWithPassword(password : Text, complaintNumber : Text, input : ComplaintEditInput) : async () {
-    checkAdminPassword(password);
-    let complaint = switch (complaints.get(complaintNumber)) {
-      case (null) { Runtime.trap("Complaint not found") };
-      case (?c) { c };
-    };
-    let updatedComplaint : Complaint = {
-      complaint with
-      complainantName = input.complainantName;
-      workerId = input.workerId;
-      mobile = input.mobile;
-      companyName = input.companyName;
-      workAddress = input.workAddress;
-      complaintType = input.complaintType;
-      subject = input.subject;
-      details = input.details;
-      incidentDate = input.incidentDate;
-      priority = input.priority;
-      status = input.status;
-      statusDescription = input.statusDescription;
-      officer = input.officer;
-      department = input.department;
-      officerRemarks = input.officerRemarks;
-      nextStep = input.nextStep;
-      updatedAt = Time.now();
-    };
-    complaints.add(complaintNumber, updatedComplaint);
-  };
-
-  public shared func assignOfficerWithPassword(password : Text, complaintNumber : Text, officer : Text, department : Text) : async () {
-    checkAdminPassword(password);
-    let complaint = switch (complaints.get(complaintNumber)) {
-      case (null) { Runtime.trap("Complaint not found") };
-      case (?c) { c };
-    };
-    let updatedComplaint : Complaint = {
-      complaint with
-      officer = ?officer;
-      department = ?department;
-      updatedAt = Time.now();
-    };
-    complaints.add(complaintNumber, updatedComplaint);
-  };
-
-  public shared func addOfficerRemarksWithPassword(password : Text, complaintNumber : Text, remarks : Text, nextStep : Text) : async () {
-    checkAdminPassword(password);
-    let complaint = switch (complaints.get(complaintNumber)) {
-      case (null) { Runtime.trap("Complaint not found") };
-      case (?c) { c };
-    };
-    let updatedComplaint : Complaint = {
-      complaint with
-      officerRemarks = ?remarks;
-      nextStep = ?nextStep;
-      updatedAt = Time.now();
-    };
-    complaints.add(complaintNumber, updatedComplaint);
-  };
-
-  public shared func addNoticeWithPassword(password : Text, input : NoticeInput) : async Text {
-    checkAdminPassword(password);
-    let noticeId = Time.now().toText();
-    let notice : NoticeV2 = {
-      title = input.title;
-      content = input.content;
-      isImportant = input.isImportant;
-      imageId = input.imageId;
-      createdAt = Time.now();
-    };
-    notices2.add(noticeId, notice);
-    noticeId;
-  };
-
-  public shared func deleteNoticeWithPassword(password : Text, noticeId : Text) : async () {
-    checkAdminPassword(password);
-    if (not notices2.containsKey(noticeId)) {
-      Runtime.trap("Notice not found");
-    };
-    notices2.remove(noticeId);
-  };
-
-  public shared func addNewsWithPassword(password : Text, input : NewsInput) : async Text {
-    checkAdminPassword(password);
-    newsCounter += 1;
-    let newsId = "NEWS" # newsCounter.toText() # "_" # Time.now().toText();
-    let news : News.News = {
-      title = input.title;
-      content = input.content;
-      imageId = input.imageId;
-      isBreaking = input.isBreaking;
-      createdAt = Time.now();
-    };
-    newsItems.add(newsId, news);
-    newsId;
-  };
-
-  public shared func deleteNewsWithPassword(password : Text, newsId : Text) : async () {
-    checkAdminPassword(password);
-    if (not newsItems.containsKey(newsId)) {
-      Runtime.trap("News not found");
-    };
-    newsItems.remove(newsId);
-  };
-
 };

@@ -217,7 +217,22 @@ export interface backendInterface {
     updateComplaint(complaintNumber: string, input: ComplaintEditInput): Promise<void>;
     updateComplaintStatus(complaintNumber: string, newStatus: Status): Promise<void>;
     updateComplaintStatusWithDescription(complaintNumber: string, newStatus: Status, description: string): Promise<void>;
+    deleteNotice(noticeId: string): Promise<void>;
+    deleteNews(newsId: string): Promise<void>;
+    getNews(): Promise<Array<unknown>>;
+    addNews(input: NoticeInput): Promise<string>;
+    getAllComplaintsWithPassword(password: string): Promise<Array<Complaint>>;
+    getComplaintStatsWithPassword(password: string): Promise<ComplaintStats>;
+    updateComplaintStatusWithPassword(password: string, complaintNumber: string, newStatus: Status, description: string): Promise<void>;
+    updateComplaintWithPassword(password: string, complaintNumber: string, input: ComplaintEditInput): Promise<void>;
+    assignOfficerWithPassword(password: string, complaintNumber: string, officer: string, department: string): Promise<void>;
+    addOfficerRemarksWithPassword(password: string, complaintNumber: string, remarks: string, nextStep: string): Promise<void>;
+    addNoticeWithPassword(password: string, input: NoticeInput): Promise<string>;
+    deleteNoticeWithPassword(password: string, noticeId: string): Promise<void>;
+    addNewsWithPassword(password: string, input: NoticeInput): Promise<string>;
+    deleteNewsWithPassword(password: string, newsId: string): Promise<void>;
 }
+
 import type { Complaint as _Complaint, ComplaintEditInput as _ComplaintEditInput, ComplaintInput as _ComplaintInput, Priority as _Priority, Status as _Status, Time as _Time, UserProfile as _UserProfile, UserRole as _UserRole, _CaffeineStorageRefillInformation as __CaffeineStorageRefillInformation, _CaffeineStorageRefillResult as __CaffeineStorageRefillResult } from "./declarations/backend.did.d.ts";
 export class Backend implements backendInterface {
     constructor(private actor: ActorSubclass<_SERVICE>, private _uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, private _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, private processError?: (error: unknown) => never){}
@@ -570,6 +585,86 @@ export class Backend implements backendInterface {
             const result = await this.actor.updateComplaintStatusWithDescription(arg0, to_candid_Status_n27(this._uploadFile, this._downloadFile, arg1), arg2);
             return result;
         }
+    }
+
+    // Password-based admin methods - call actor directly bypassing Candid wrapper
+    async getAllComplaintsWithPassword(password: string): Promise<Array<Complaint>> {
+        const result = await (this.actor as any).getAllComplaintsWithPassword(password);
+        return result.map((c: any) => this._mapComplaint(c));
+    }
+
+    _mapComplaint(c: any): Complaint {
+        return {
+            complainantName: c.complainantName,
+            workerId: c.workerId?.[0] ?? undefined,
+            mobile: c.mobile,
+            companyName: c.companyName,
+            workAddress: c.workAddress,
+            complaintType: c.complaintType,
+            subject: c.subject,
+            details: c.details,
+            incidentDate: c.incidentDate,
+            priority: c.priority?.urgent !== undefined ? Priority.urgent : c.priority?.veryUrgent !== undefined ? Priority.veryUrgent : Priority.normal,
+            attachmentIds: c.attachmentIds,
+            complaintNumber: c.complaintNumber,
+            status: c.status?.resolved !== undefined ? Status.resolved : c.status?.pending !== undefined ? Status.pending : c.status?.investigating !== undefined ? Status.investigating : c.status?.underReview !== undefined ? Status.underReview : Status.rejected,
+            statusDescription: c.statusDescription?.[0] ?? undefined,
+            officer: c.officer?.[0] ?? undefined,
+            department: c.department?.[0] ?? undefined,
+            officerRemarks: c.officerRemarks?.[0] ?? undefined,
+            nextStep: c.nextStep?.[0] ?? undefined,
+            createdAt: c.createdAt,
+            updatedAt: c.updatedAt,
+        };
+    }
+
+    async getComplaintStatsWithPassword(password: string): Promise<ComplaintStats> {
+        const result = await (this.actor as any).getComplaintStatsWithPassword(password);
+        return { total: result.total, pending: result.pending, resolved: result.resolved, urgent: result.urgent };
+    }
+
+    async getNews(): Promise<Array<unknown>> {
+        return (this.actor as any).getNews();
+    }
+
+    async addNews(input: NoticeInput): Promise<string> {
+        return (this.actor as any).addNews(input);
+    }
+
+    async deleteNews(newsId: string): Promise<void> {
+        return (this.actor as any).deleteNews(newsId);
+    }
+
+    async updateComplaintStatusWithPassword(password: string, complaintNumber: string, newStatus: Status, description: string): Promise<void> {
+        return (this.actor as any).updateComplaintStatusWithPassword(password, complaintNumber, to_candid_Status_n27(this._uploadFile, this._downloadFile, newStatus), description);
+    }
+
+    async updateComplaintWithPassword(password: string, complaintNumber: string, input: ComplaintEditInput): Promise<void> {
+        return (this.actor as any).updateComplaintWithPassword(password, complaintNumber, input);
+    }
+
+    async assignOfficerWithPassword(password: string, complaintNumber: string, officer: string, department: string): Promise<void> {
+        return (this.actor as any).assignOfficerWithPassword(password, complaintNumber, officer, department);
+    }
+
+    async addOfficerRemarksWithPassword(password: string, complaintNumber: string, remarks: string, nextStep: string): Promise<void> {
+        return (this.actor as any).addOfficerRemarksWithPassword(password, complaintNumber, remarks, nextStep);
+    }
+
+    async addNoticeWithPassword(password: string, input: NoticeInput): Promise<string> {
+        return (this.actor as any).addNoticeWithPassword(password, input);
+    }
+
+    async deleteNoticeWithPassword(password: string, noticeId: string): Promise<void> {
+        return (this.actor as any).deleteNoticeWithPassword(password, noticeId);
+    }
+
+    async addNewsWithPassword(password: string, input: NoticeInput): Promise<string> {
+        return (this.actor as any).addNewsWithPassword(password, input);
+    }
+
+    async deleteNewsWithPassword(password: string, newsId: string): Promise<void> {
+        return (this.actor as any).deleteNewsWithPassword(password, newsId);
     }
 }
 function from_candid_Complaint_n11(_uploadFile: (file: ExternalBlob) => Promise<Uint8Array>, _downloadFile: (file: Uint8Array) => Promise<ExternalBlob>, value: _Complaint): Complaint {
