@@ -1,0 +1,99 @@
+@import url("https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap");
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --radius: 0.75rem;
+
+    /* Deep navy #0B1F3B → oklch(0.22 0.055 248) */
+    --navy: 0.22 0.055 248;
+    /* Primary green #2E7D32 → oklch(0.48 0.16 145) */
+    --green-primary: 0.48 0.16 145;
+    /* Primary red #C62828 → oklch(0.44 0.19 27) */
+    --red-primary: 0.44 0.19 27;
+    /* Page background #F5F7FA → oklch(0.975 0.006 248) */
+    --page-bg: 0.975 0.006 248;
+    /* Card white #FFFFFF */
+    --card-bg: 1 0 0;
+    /* Primary text #1F2937 → oklch(0.22 0.02 248) */
+    --text-primary: 0.22 0.02 248;
+    /* Secondary text #6B7280 → oklch(0.54 0.01 248) */
+    --text-secondary: 0.54 0.01 248;
+    /* Border #E5E7EB → oklch(0.92 0.008 248) */
+    --border-color: 0.92 0.008 248;
+
+    /* Semantic tokens */
+    --background: var(--page-bg);
+    --foreground: var(--text-primary);
+    --card: var(--card-bg);
+    --card-foreground: var(--text-primary);
+    --popover: var(--card-bg);
+    --popover-foreground: var(--text-primary);
+    --primary: var(--navy);
+    --primary-foreground: 1 0 0;
+    --secondary: var(--green-primary);
+    --secondary-foreground: 1 0 0;
+    --muted: 0.97 0.006 248;
+    --muted-foreground: var(--text-secondary);
+    --accent: 0.96 0.01 145;
+    --accent-foreground: var(--green-primary);
+    --destructive: var(--red-primary);
+    --destructive-foreground: 1 0 0;
+    --border: var(--border-color);
+    --input: var(--border-color);
+    --ring: var(--green-primary);
+    --chart-1: var(--red-primary);
+    --chart-2: var(--green-primary);
+    --chart-3: var(--navy);
+    --chart-4: 0.65 0.15 60;
+    --chart-5: 0.55 0.12 210;
+    --sidebar: var(--navy);
+    --sidebar-foreground: 1 0 0;
+    --sidebar-primary: var(--green-primary);
+    --sidebar-primary-foreground: 1 0 0;
+    --sidebar-accent: 0.3 0.06 248;
+    --sidebar-accent-foreground: 1 0 0;
+    --sidebar-border: 0.3 0.04 248;
+    --sidebar-ring: var(--green-primary);
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: "Hind Siliguri", "DM Sans", sans-serif;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: "Hind Siliguri", "DM Sans", sans-serif;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  .btn-red {
+    @apply bg-red-primary text-white font-semibold px-6 py-3 rounded-[10px] hover:opacity-90 transition-opacity;
+  }
+  .btn-navy {
+    @apply bg-navy text-white font-semibold px-6 py-3 rounded-[10px] hover:opacity-90 transition-opacity;
+  }
+  .btn-green {
+    @apply bg-green-primary text-white font-semibold px-6 py-3 rounded-[10px] hover:opacity-90 transition-opacity;
+  }
+  .card-shadow {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+  }
+  .section-title {
+    @apply text-2xl font-bold text-navy mb-6;
+  }
+}
