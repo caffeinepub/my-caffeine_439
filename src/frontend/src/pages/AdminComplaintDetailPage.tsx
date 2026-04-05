@@ -1,6 +1,13 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -20,6 +27,7 @@ import {
   Loader2,
   MessageSquare,
   Save,
+  Trash2,
   UserCheck,
   X,
 } from "lucide-react";
@@ -89,6 +97,9 @@ export default function AdminComplaintDetailPage() {
     officerRemarks: "",
     nextStep: "",
   });
+
+  // Delete dialog state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const hasPasswordSession = isPasswordAdmin();
 
@@ -246,6 +257,28 @@ export default function AdminComplaintDetailPage() {
     onError: () => toast.error("অভিযোগ সম্পাদনা সম্ভব হয়নি"),
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: async () => {
+      if (!actor) throw new Error("No actor");
+      const actorAny = actor as any;
+      if (hasPasswordSession) {
+        await actorAny.deleteComplaintWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+        );
+      } else {
+        await actorAny.deleteComplaint(complaintNumber);
+      }
+    },
+    onSuccess: () => {
+      toast.success("অভিযোগ মুছে ফেলা হয়েছে");
+      queryClient.invalidateQueries({ queryKey: ["allComplaints"] });
+      queryClient.invalidateQueries({ queryKey: ["complaintStats"] });
+      navigate({ to: "/admin/dashboard" });
+    },
+    onError: () => toast.error("অভিযোগ মুছতে সমস্যা হয়েছে"),
+  });
+
   const updateEditForm = (field: keyof ComplaintEditInput, value: string) => {
     setEditForm((prev) => ({ ...prev, [field]: value }));
   };
@@ -293,7 +326,7 @@ export default function AdminComplaintDetailPage() {
             <h1 className="font-bold">অভিযোগ বিস্তারিত</h1>
             <p className="text-white/60 text-xs">{complaint.complaintNumber}</p>
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2">
             <StatusBadge status={complaint.status} />
             <Button
               variant="outline"
@@ -311,6 +344,16 @@ export default function AdminComplaintDetailPage() {
                   <Edit size={14} /> সম্পাদনা করুন
                 </>
               )}
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteDialog(true)}
+              className="bg-red-600/80 border-red-400/50 text-white hover:bg-red-600 gap-1"
+              data-ocid="complaint_detail.delete.button"
+            >
+              <Trash2 size={14} />
+              মুছুন
             </Button>
           </div>
         </div>
@@ -843,6 +886,57 @@ export default function AdminComplaintDetailPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={showDeleteDialog}
+        onOpenChange={(open) => {
+          if (!open) setShowDeleteDialog(false);
+        }}
+      >
+        <DialogContent
+          className="max-w-sm"
+          data-ocid="complaint_detail.delete.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <Trash2 size={18} />
+              অভিযোগ মুছে ফেলুন
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-700">
+              অভিযোগ নম্বর{" "}
+              <span className="font-bold font-mono text-navy">
+                {complaintNumber}
+              </span>{" "}
+              স্থায়ীভাবে মুছে ফেলা হবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteDialog(false)}
+              data-ocid="complaint_detail.delete.cancel_button"
+            >
+              বাতিল
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => deleteMutation.mutate()}
+              disabled={deleteMutation.isPending}
+              data-ocid="complaint_detail.delete.confirm_button"
+            >
+              {deleteMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin mr-1" />
+              ) : (
+                <Trash2 size={16} className="mr-1" />
+              )}
+              মুছে ফেলুন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

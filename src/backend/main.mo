@@ -460,6 +460,17 @@ actor {
     newsItems.remove(newsId);
   };
 
+
+  public shared ({ caller }) func deleteComplaint(complaintNumber : Text) : async () {
+    if (not (AccessControl.isAdmin(accessControlState, caller))) {
+      Runtime.trap("Unauthorized: Only admins can perform this action");
+    };
+    if (not complaints.containsKey(complaintNumber)) {
+      Runtime.trap("Complaint not found");
+    };
+    complaints.remove(complaintNumber);
+  };
+
   // ============================================================
   // Password-based admin functions (for password login admins)
   // ============================================================
@@ -610,6 +621,15 @@ actor {
       Runtime.trap("News not found");
     };
     newsItems.remove(newsId);
+  };
+
+
+  public shared func deleteComplaintWithPassword(password : Text, complaintNumber : Text) : async () {
+    checkAdminPassword(password);
+    if (not complaints.containsKey(complaintNumber)) {
+      Runtime.trap("Complaint not found");
+    };
+    complaints.remove(complaintNumber);
   };
 
 };

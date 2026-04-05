@@ -124,6 +124,8 @@ export interface backendInterface {
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
     assignOfficer(complaintNumber: string, officer: string, department: string): Promise<void>;
     assignOfficerWithPassword(password: string, complaintNumber: string, officer: string, department: string): Promise<void>;
+    deleteComplaint(complaintNumber: string): Promise<void>;
+    deleteComplaintWithPassword(password: string, complaintNumber: string): Promise<void>;
     deleteNotice(noticeId: string): Promise<void>;
     deleteNoticeWithPassword(password: string, noticeId: string): Promise<void>;
     deleteNews(newsId: string): Promise<void>;

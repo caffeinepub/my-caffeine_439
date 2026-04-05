@@ -21,7 +21,6 @@ export function useComplaintStats() {
       if (!actor) return { total: 0n, pending: 0n, resolved: 0n, urgent: 0n };
       return actor.getComplaintStats();
     },
-    // Enable even without auth - stats are public
     enabled: !!actor,
     staleTime: 30000,
   });
@@ -67,7 +66,6 @@ export function useComplaintByNumber(complaintNumber: string) {
         const result = await actor.getComplaintByNumber(complaintNumber);
         return result ?? null;
       } catch (err) {
-        // If complaint not found, return null
         const errMsg = String(err);
         if (
           errMsg.includes("not found") ||
@@ -78,7 +76,6 @@ export function useComplaintByNumber(complaintNumber: string) {
         return null;
       }
     },
-    // getComplaintByNumber is now public - no need to wait for auth
     enabled: !!actor && !!complaintNumber,
     retry: false,
   });
@@ -92,7 +89,7 @@ export function useAllComplaints() {
     queryFn: async () => {
       if (!actor) return [];
       try {
-        // If password admin, use password-based function
+        // If password admin, use password-based function (works with anonymous actor)
         if (pwAdmin) {
           return await actor.getAllComplaintsWithPassword(ADMIN_PASSWORD);
         }
@@ -103,8 +100,11 @@ export function useAllComplaints() {
         return [];
       }
     },
-    enabled: !!actor && !isFetching,
+    // For password admin, only need actor (no isFetching check needed since it's public)
+    enabled: pwAdmin ? !!actor : !!actor && !isFetching,
     staleTime: 10000,
+    refetchOnMount: true,
+    refetchOnWindowFocus: true,
   });
 }
 
@@ -114,7 +114,6 @@ export function useIsAdmin() {
   return useQuery<boolean>({
     queryKey: ["isAdmin", pwAdmin],
     queryFn: async () => {
-      // Password admin is always considered admin
       if (pwAdmin) return true;
       if (!actor) return false;
       try {

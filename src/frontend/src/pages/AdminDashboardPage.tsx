@@ -31,6 +31,7 @@ import {
   Newspaper,
   Plus,
   Search,
+  Trash2,
   X,
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -100,6 +101,9 @@ export default function AdminDashboardPage() {
   const [filterPriority, setFilterPriority] = useState("all");
   const [filterType, setFilterType] = useState("all");
 
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
   // Notice modal state
   const [showNoticeModal, setShowNoticeModal] = useState(false);
   const [noticeForm, setNoticeForm] = useState<NoticeFormState>({
@@ -126,7 +130,6 @@ export default function AdminDashboardPage() {
 
   const { upload: uploadImage, uploading: uploadingImage } = useImageUpload();
 
-  // Check both password session and internet identity
   const hasPasswordSession = isPasswordAdmin();
 
   useEffect(() => {
@@ -147,7 +150,6 @@ export default function AdminDashboardPage() {
     navigate({ to: "/admin/login" });
   };
 
-  // Notice image upload handler
   const handleNoticeImageChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -166,7 +168,6 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // News image upload handler
   const handleNewsImageChange = async (
     e: React.ChangeEvent<HTMLInputElement>,
   ) => {
@@ -255,6 +256,28 @@ export default function AdminDashboardPage() {
       queryClient.invalidateQueries({ queryKey: ["news"] });
     },
     onError: () => toast.error("খবর প্রকাশ সম্ভব হয়নি"),
+  });
+
+  const deleteComplaintMutation = useMutation({
+    mutationFn: async (complaintNumber: string) => {
+      if (!actor) throw new Error("No actor");
+      const actorAny = actor as any;
+      if (hasPasswordSession) {
+        await actorAny.deleteComplaintWithPassword(
+          ADMIN_PASSWORD,
+          complaintNumber,
+        );
+      } else {
+        await actorAny.deleteComplaint(complaintNumber);
+      }
+    },
+    onSuccess: () => {
+      toast.success("অভিযোগ মুছে ফেলা হয়েছে");
+      setDeleteTarget(null);
+      queryClient.invalidateQueries({ queryKey: ["allComplaints"] });
+      queryClient.invalidateQueries({ queryKey: ["complaintStats"] });
+    },
+    onError: () => toast.error("অভিযোগ মুছতে সমস্যা হয়েছে"),
   });
 
   const filtered = useMemo(() => {
@@ -543,20 +566,31 @@ export default function AdminDashboardPage() {
                           ).toLocaleDateString("bn-BD")}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <Link
-                            to="/admin/complaint/$complaintNumber"
-                            params={{ complaintNumber: c.complaintNumber }}
-                            data-ocid={`admin_dashboard.view_complaint.${i + 1}.button`}
-                          >
+                          <div className="flex items-center justify-end gap-1">
+                            <Link
+                              to="/admin/complaint/$complaintNumber"
+                              params={{ complaintNumber: c.complaintNumber }}
+                              data-ocid={`admin_dashboard.view_complaint.${i + 1}.button`}
+                            >
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                className="h-7 px-2 text-xs"
+                              >
+                                <Eye size={13} className="mr-1" />
+                                দেখুন
+                              </Button>
+                            </Link>
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 px-2 text-xs"
+                              className="h-7 px-2 text-xs border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700"
+                              onClick={() => setDeleteTarget(c.complaintNumber)}
+                              data-ocid={`admin_dashboard.delete_complaint.${i + 1}.button`}
                             >
-                              <Eye size={13} className="mr-1" />
-                              দেখুন
+                              <Trash2 size={13} />
                             </Button>
-                          </Link>
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -567,6 +601,59 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => {
+          if (!open) setDeleteTarget(null);
+        }}
+      >
+        <DialogContent
+          className="max-w-sm"
+          data-ocid="admin_dashboard.delete.dialog"
+        >
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <Trash2 size={18} />
+              অভিযোগ মুছে ফেলুন
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-2">
+            <p className="text-sm text-gray-700">
+              অভিযোগ নম্বর{" "}
+              <span className="font-bold font-mono text-navy">
+                {deleteTarget}
+              </span>{" "}
+              স্থায়ীভাবে মুছে ফেলা হবে। এই কাজ পূর্বাবস্থায় ফেরানো যাবে না।
+            </p>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeleteTarget(null)}
+              data-ocid="admin_dashboard.delete.cancel_button"
+            >
+              বাতিল
+            </Button>
+            <Button
+              className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() =>
+                deleteTarget && deleteComplaintMutation.mutate(deleteTarget)
+              }
+              disabled={deleteComplaintMutation.isPending}
+              data-ocid="admin_dashboard.delete.confirm_button"
+            >
+              {deleteComplaintMutation.isPending ? (
+                <Loader2 size={16} className="animate-spin mr-1" />
+              ) : (
+                <Trash2 size={16} className="mr-1" />
+              )}
+              মুছে ফেলুন
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Add Notice Modal */}
       <Dialog
@@ -611,7 +698,6 @@ export default function AdminDashboardPage() {
                 data-ocid="admin_dashboard.notice_content.textarea"
               />
             </div>
-            {/* Image Upload - using button for accessibility */}
             <div>
               <Label className="text-sm font-semibold mb-1.5 block">
                 ফটো (ঐচ্ছিক)
@@ -766,7 +852,6 @@ export default function AdminDashboardPage() {
                 data-ocid="admin_dashboard.news_content.textarea"
               />
             </div>
-            {/* News Image Upload - using button for accessibility */}
             <div>
               <Label className="text-sm font-semibold mb-1.5 block">
                 ফটো (ঐচ্ছিক)
